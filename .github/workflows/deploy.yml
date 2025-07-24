@@ -1,0 +1,66 @@
+name: Deployed to Launch 
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check for .cs-launch file
+        run: |
+         echo "Current directory:"
+         pwd
+         echo "Files including dotfiles:"
+         ls -la
+
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build the project
+        run: npm run build
+
+      - name: Show latest commit ID and message
+        run: |
+            echo "Latest Commit ID:"
+            git log -1 --pretty=format:"%H"
+            echo ""
+            echo "Latest Commit Message:"
+            git log -1 --pretty=format:"%s"
+
+      - name: Install Contentstack CLI
+        run: npm install -g @contentstack/cli
+
+      - name: Verify Contentstack CLI Installation
+        run: csdx --version
+
+      - name: Set Launch Region
+        run: csdx config:set:region AWS-EU
+
+      - name: Authenticate to Contentstack
+        env:
+          CSDX_EMAIL: ${{ secrets.CSDX_EMAIL }}
+          CSDX_PASSWORD: ${{ secrets.CSDX_PASSWORD }}
+        run:
+          csdx auth:login -u "$CSDX_EMAIL" -p "$CSDX_PASSWORD"
+
+      - name: Deploy using Launch config
+        run: 
+          csdx launch --redeploy-latest 
+          
+        # ADD ENVIRONMENT FLAG IF YOU HAVE DIFFERENT ENVIRONMENT AND YOU WANT TO DEPLOY IN THE SPECIFIC ENVIRONMENT
+        # --environment EnvironmentName 
+
+        # ADD CONFIG FLAG IF YOU .cs-launch.json IS NOT IN THE ROOT DIRECTORY
+        # --config Path_to_launch_config_file

@@ -1,0 +1,28 @@
+{
+  "project": {
+    "uid": "687e2d2b1156ed4435a64163",
+    "name": "launch-deploy-pipeline",
+    "projectType": "FILEUPLOAD",
+    "organizationUid": "bltb065b4ba5011f44e",
+    "environments": [
+      {
+        "uid": "687e2d2b1156ed4435a6416a",
+        "name": "Default",
+        "frameworkPreset": "NEXTJS",
+        "__typename": "Environment"
+      }
+    ],
+    "__typename": "Project",
+    "deployments": [
+      {
+        "uid": "687e2d2b1156ed4435a64175",
+        "status": "QUEUED",
+        "createdAt": "2025-07-21T12:06:03.510Z",
+        "updatedAt": "2025-07-21T12:06:03.706Z",
+        "deploymentUrl": "launch-deploy-pipeline.contentstackapps.com",
+        "commitMessage": "Triggered By File Upload",
+        "__typename": "Deployment"
+      }
+    ]
+  }
+}
