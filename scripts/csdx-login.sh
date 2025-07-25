@@ -1,21 +1,36 @@
-#!/usr/bin/env bash
+#!/usr/bin/expect -f
 
-EMAIL="${CSDX_EMAIL}"
-PASSWORD="${CSDX_PASSWORD}"
-TOTP_SECRET="${CSDX_TOTP_SECRET}"
+# Get command-line arguments
+set email [lindex $argv 0]
+set password [lindex $argv 1]
+set totp_secret [lindex $argv 2]
 
-# Generate TOTP using Node.js + otplib
-OTP=$(node <<EOF
-const { authenticator } = require('otplib');
-console.log(authenticator.generate('${TOTP_SECRET}'));
-EOF
-)
+# Generate OTP using otplib
+set otp [exec node -e "const { authenticator } = require('otplib'); console.log(authenticator.generate('${totp_secret}'))"]
 
-echo "🔐 Generated OTP: $OTP"
+# Start login
+spawn csdx auth:login -u $email -p $password --otp $otp
+expect {
+  "Successfully logged in!!" {
+    puts "✅ Login successful"
+  }
+  timeout {
+    puts "❌ Login timed out"
+    exit 1
+  }
+  eof {
+    puts "✅ Login script finished"
+  }
+}
 
-expect <<EOF
-spawn csdx auth:login -u "$EMAIL" -p "$PASSWORD"
-expect "Please select OTP channel" { send "1\r" }
-expect "Please provide the security code" { send "$OTP\r" }
-expect "Successfully logged in" 
-EOF
+# Immediately deploy
+spawn csdx launch --redeploy-latest
+expect {
+  timeout {
+    puts "❌ Deploy timed out"
+    exit 1
+  }
+  eof {
+    puts "✅ Deploy finished"
+  }
+}
