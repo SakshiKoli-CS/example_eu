@@ -14,28 +14,32 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v3
         with:
           node-version: 18
 
-      - name: Install dependencies
+      - name: Install project dependencies
         run: npm install
 
-      - name: Build project
-        run: npm run build
-
-      - name: Install Contentstack CLI
-        run: npm install -g @contentstack/cli
+      - name: Install CLI tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y expect
+          npm install -g @contentstack/cli
+          npm install otplib
 
       - name: Set Launch Region
         run: csdx config:set:region AWS-EU
 
-      - name: Login with TOTP
+      - name: Authenticate with Contentstack (TOTP)
         env:
           CSDX_EMAIL: ${{ secrets.CSDX_EMAIL }}
           CSDX_PASSWORD: ${{ secrets.CSDX_PASSWORD }}
           CSDX_TOTP_SECRET: ${{ secrets.CSDX_TOTP_SECRET }}
-        run: node scripts/loginWithTOTP.js
+        run: ./scripts/csdx-login.sh
 
-      - name: Deploy using Launch
+      - name: Build project
+        run: npm run build
+
+      - name: Deploy with Launch
         run: csdx launch --redeploy-latest
