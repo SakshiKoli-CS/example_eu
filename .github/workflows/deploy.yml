@@ -1,4 +1,4 @@
-name: Deployed to Launch 
+name: Deploy to Launch
 
 on:
   push:
@@ -12,10 +12,10 @@ jobs:
     steps:
       - name: Check for .cs-launch file
         run: |
-         echo "Current directory:"
-         pwd
-         echo "Files including dotfiles:"
-         ls -la
+          echo "Current directory:"
+          pwd
+          echo "Files including dotfiles:"
+          ls -la
 
       - name: Checkout code
         uses: actions/checkout@v3
@@ -33,11 +33,11 @@ jobs:
 
       - name: Show latest commit ID and message
         run: |
-            echo "Latest Commit ID:"
-            git log -1 --pretty=format:"%H"
-            echo ""
-            echo "Latest Commit Message:"
-            git log -1 --pretty=format:"%s"
+          echo "Latest Commit ID:"
+          git log -1 --pretty=format:"%H"
+          echo ""
+          echo "Latest Commit Message:"
+          git log -1 --pretty=format:"%s"
 
       - name: Install Contentstack CLI
         run: npm install -g @contentstack/cli
@@ -48,19 +48,28 @@ jobs:
       - name: Set Launch Region
         run: csdx config:set:region AWS-EU
 
-      - name: Authenticate to Contentstack
+      - name: TOTP Login and Extract Token
+        id: login
         env:
           CSDX_EMAIL: ${{ secrets.CSDX_EMAIL }}
           CSDX_PASSWORD: ${{ secrets.CSDX_PASSWORD }}
-        run:
-          csdx auth:login -u "$CSDX_EMAIL" -p "$CSDX_PASSWORD"
+          CSDX_TOTP_SECRET: ${{ secrets.CSDX_TOTP_SECRET }}
+        run: |
+          node scripts/loginWithTOTP.js > login_output.txt
+          cat login_output.txt
+          TOKEN=$(grep -oP '(?<=AuthToken:\s)(\S+)' login_output.txt | tail -1)
+          echo "Extracted token: $TOKEN"
+          echo "::add-mask::$TOKEN"
+          echo "CSDX_AUTH_TOKEN=$TOKEN" >> $GITHUB_ENV
+
+      - name: Set AuthToken in CLI
+        run: csdx config:set authtoken "$CSDX_AUTH_TOKEN"
 
       - name: Deploy using Launch config
-        run: 
-          csdx launch --redeploy-latest 
-          
-        # ADD ENVIRONMENT FLAG IF YOU HAVE DIFFERENT ENVIRONMENT AND YOU WANT TO DEPLOY IN THE SPECIFIC ENVIRONMENT
-        # --environment EnvironmentName 
+        run: csdx launch --redeploy-latest
 
-        # ADD CONFIG FLAG IF YOU .cs-launch.json IS NOT IN THE ROOT DIRECTORY
-        # --config Path_to_launch_config_file
+        # If deploying to a specific environment:
+        # run: csdx launch --redeploy-latest --environment your-env-name
+
+        # If your .cs-launch.json is not in root:
+        # run: csdx launch --redeploy-latest --config path/to/.cs-launch.json
