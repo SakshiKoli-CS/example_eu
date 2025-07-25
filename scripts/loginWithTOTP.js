@@ -17,7 +17,6 @@ async function login() {
     const otp = authenticator.generate(CSDX_TOTP_SECRET)
     console.log(`🔐 Generated OTP: ${otp}`)
 
-    console.log('📡 Sending login request...')
     const response = await axios.post(
       'https://eu-api.contentstack.com/v3/user-session',
       {
@@ -34,9 +33,7 @@ async function login() {
       }
     )
 
-    const authtoken = response.headers['authtoken']
     console.log('✅ Login successful!')
-    console.log('🔑 AuthToken:', authtoken)
   } catch (error) {
     if (error.response) {
       console.error('❌ Login failed.')
@@ -44,6 +41,7 @@ async function login() {
     } else {
       console.error('❌ Unexpected error:', error.message)
     }
+    process.exit(1)
   }
 }
 
