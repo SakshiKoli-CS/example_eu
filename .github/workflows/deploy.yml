@@ -28,18 +28,18 @@ jobs:
           npm install -g @contentstack/cli
           npm install otplib
 
+      - name: Build project
+        run: npm run build
+        
       - name: Set Launch Region
         run: csdx config:set:region AWS-EU
 
-      - name: Authenticate with Contentstack (TOTP)
+      - name: Login and Deploy to Launch
         env:
-          CSDX_EMAIL: ${{ secrets.CSDX_EMAIL }}
-          CSDX_PASSWORD: ${{ secrets.CSDX_PASSWORD }}
-          CSDX_TOTP_SECRET: ${{ secrets.CSDX_TOTP_SECRET }}
-        run: ./scripts/csdx-login.sh
-
-      - name: Build project
-        run: npm run build
-
-      - name: Deploy with Launch
-        run: csdx launch --redeploy-latest
+           CSDX_EMAIL: ${{ secrets.CSDX_EMAIL }}
+           CSDX_PASSWORD: ${{ secrets.CSDX_PASSWORD }}
+           CSDX_TOTP_SECRET: ${{ secrets.CSDX_TOTP_SECRET }}
+        run: |
+          node scripts/loginWithTOTP.js
+          csdx auth:whoami
+          csdx launch --redeploy-latest
