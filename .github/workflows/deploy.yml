@@ -32,22 +32,48 @@ jobs:
       - name: Set Launch Region
         run: csdx config:set:region AWS-EU
 
-      - name: Authenticate with Contentstack (TOTP)
-        env:
-         CSDX_EMAIL: ${{ secrets.CSDX_EMAIL }}
-         CSDX_PASSWORD: ${{ secrets.CSDX_PASSWORD }}
-         CSDX_TOTP_SECRET: ${{ secrets.CSDX_TOTP_SECRET }}
+      - name: Authenticate with Contentstack using JavaScript + TOTP
+       env:
+          CSDX_EMAIL: ${{ secrets.CSDX_EMAIL }}
+          CSDX_PASSWORD: ${{ secrets.CSDX_PASSWORD }}
+          CSDX_TOTP_SECRET: ${{ secrets.CSDX_TOTP_SECRET }}
         run: |
-
-            node -e "
+            node <<EOF
             const { spawn } = require('child_process');
             const { authenticator } = require('otplib');
-            const token = authenticator.generate(process.env.CSDX_TOTP_SECRET);
-            const login = spawn('csdx', ['auth:login', '-u', process.env.CSDX_EMAIL, '-p', process.env.CSDX_PASSWORD]);
-            login.stdout.on('data', d => { if (d.toString().includes('two-factor')) login.stdin.write(token + '\n'); });
-            login.stderr.on('data', d => process.stderr.write(d));
-            login.on('close', code => process.exit(code));
-            "
+
+            const email = process.env.CSDX_EMAIL;
+            const password = process.env.CSDX_PASSWORD;
+            const secret = process.env.CSDX_TOTP_SECRET;
+            const otp = authenticator.generate(secret);
+
+            console.log("🔐 OTP generated:", otp);
+
+            const login = spawn('csdx', ['auth:login', '-u', email, '-p', password]);
+
+            login.stdout.on('data', (data) => {
+              const output = data.toString();
+              console.log(output);
+
+              if (output.includes('OTP channel')) {
+                login.stdin.write('1\n');
+              }
+
+              if (output.includes('security code')) {
+                login.stdin.write(otp + '\n');
+              }
+            });
+
+            login.stderr.on('data', (data) => {
+              console.error(data.toString());
+            });
+
+            login.on('close', (code) => {
+              console.log('Login process exited with code:', code);
+              process.exit(code);
+            });
+            EOF
+            
       - name: Verify CSDX Login
         run: csdx auth:whoami
 
