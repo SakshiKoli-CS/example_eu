@@ -38,41 +38,48 @@ jobs:
           CSDX_PASSWORD: ${{ secrets.CSDX_PASSWORD }}
           CSDX_TOTP_SECRET: ${{ secrets.CSDX_TOTP_SECRET }}
         run: |
-            node <<EOF
-            const { spawn } = require('child_process');
-            const { authenticator } = require('otplib');
+          node <<'EOF'
+          const { spawn } = require('child_process');
+          const { authenticator } = require('otplib');
 
-            const email = process.env.CSDX_EMAIL;
-            const password = process.env.CSDX_PASSWORD;
-            const secret = process.env.CSDX_TOTP_SECRET;
-            const otp = authenticator.generate(secret);
+          const email = process.env.CSDX_EMAIL;
+          const password = process.env.CSDX_PASSWORD;
+          const secret = process.env.CSDX_TOTP_SECRET;
+          const otp = authenticator.generate(secret);
 
-            console.log("🔐 OTP generated:", otp);
+          console.log("🔐 OTP generated:", otp);
 
-            const login = spawn('csdx', ['auth:login', '-u', email, '-p', password]);
+          const login = spawn('csdx', ['auth:login', '-u', email, '-p', password]);
 
-            login.stdout.on('data', (data) => {
-              const output = data.toString();
-              console.log(output);
+          let sentChannel = false;
+          let sentOTP = false;
 
-              if (output.includes('OTP channel')) {
-                login.stdin.write('1\n');
-              }
+          login.stdout.on('data', (data) => {
+            const output = data.toString();
+            process.stdout.write(output);
 
-              if (output.includes('security code')) {
-                login.stdin.write(otp + '\n');
-              }
-            });
+            if (output.includes('Please select OTP channel') && !sentChannel) {
+              login.stdin.write('1\n');
+              sentChannel = true;
+              console.log('✅ Sent OTP channel selection');
+            }
 
-            login.stderr.on('data', (data) => {
-              console.error(data.toString());
-            });
+            if (output.includes('Please provide the security code') && !sentOTP) {
+              login.stdin.write(otp + '\n');
+              sentOTP = true;
+              console.log('✅ Sent OTP code');
+            }
+          });
 
-            login.on('close', (code) => {
-              console.log('Login process exited with code:', code);
-              process.exit(code);
-            });
-            EOF
+          login.stderr.on('data', (data) => {
+            process.stderr.write(data.toString());
+          });
+
+          login.on('close', (code) => {
+            console.log(`🔚 Login process exited with code: ${code}`);
+            process.exit(code);
+          });
+          EOF
 
       - name: Verify CSDX Login
         run: csdx auth:whoami
