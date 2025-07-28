@@ -33,7 +33,7 @@ jobs:
         run: csdx config:set:region AWS-EU
 
       - name: Authenticate with Contentstack using JavaScript + TOTP
-       env:
+        env:
           CSDX_EMAIL: ${{ secrets.CSDX_EMAIL }}
           CSDX_PASSWORD: ${{ secrets.CSDX_PASSWORD }}
           CSDX_TOTP_SECRET: ${{ secrets.CSDX_TOTP_SECRET }}
@@ -73,7 +73,7 @@ jobs:
               process.exit(code);
             });
             EOF
-            
+
       - name: Verify CSDX Login
         run: csdx auth:whoami
 
