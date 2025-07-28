@@ -35,11 +35,21 @@ jobs:
 
       - name: Authenticate with Contentstack (TOTP)
         env:
-          CSDX_EMAIL: ${{ secrets.CSDX_EMAIL }}
-          CSDX_PASSWORD: ${{ secrets.CSDX_PASSWORD }}
-          CSDX_TOTP_SECRET: ${{ secrets.CSDX_TOTP_SECRET }}
-        run: ./scripts/csdx-login.sh
+         CSDX_EMAIL: ${{ secrets.CSDX_EMAIL }}
+         CSDX_PASSWORD: ${{ secrets.CSDX_PASSWORD }}
+         CSDX_TOTP_SECRET: ${{ secrets.CSDX_TOTP_SECRET }}
+        run: |
+            npm install otplib
 
+            node -e "
+            const { spawn } = require('child_process');
+            const { authenticator } = require('otplib');
+            const token = authenticator.generate(process.env.CSDX_TOTP_SECRET);
+            const login = spawn('csdx', ['auth:login', '-u', process.env.CSDX_EMAIL, '-p', process.env.CSDX_PASSWORD]);
+            login.stdout.on('data', d => { if (d.toString().includes('two-factor')) login.stdin.write(token + '\n'); });
+            login.stderr.on('data', d => process.stderr.write(d));
+            login.on('close', code => process.exit(code));
+            "
       - name: Verify CSDX Login
         run: csdx auth:whoami
 

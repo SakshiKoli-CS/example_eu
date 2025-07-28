@@ -4,7 +4,6 @@ EMAIL="${CSDX_EMAIL}"
 PASSWORD="${CSDX_PASSWORD}"
 TOTP_SECRET="${CSDX_TOTP_SECRET}"
 
-# Generate TOTP using Node.js + otplib
 OTP=$(node <<EOF
 const { authenticator } = require('otplib');
 console.log(authenticator.generate('${TOTP_SECRET}'));
