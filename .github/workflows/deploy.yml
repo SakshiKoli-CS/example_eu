@@ -32,7 +32,7 @@ jobs:
       - name: Set Launch Region
         run: csdx config:set:region AWS-EU
 
-      - name: Authenticate with Contentstack using JavaScript + TOTP
+      - name: Login to Contentstack with TOTP (Simplified)
         env:
           CSDX_EMAIL: ${{ secrets.CSDX_EMAIL }}
           CSDX_PASSWORD: ${{ secrets.CSDX_PASSWORD }}
@@ -42,43 +42,18 @@ jobs:
           const { spawn } = require('child_process');
           const { authenticator } = require('otplib');
 
-          const email = process.env.CSDX_EMAIL;
-          const password = process.env.CSDX_PASSWORD;
-          const secret = process.env.CSDX_TOTP_SECRET;
-          const otp = authenticator.generate(secret);
+          const otp = authenticator.generate(process.env.CSDX_TOTP_SECRET);
+          const login = spawn('csdx', ['auth:login', '-u', process.env.CSDX_EMAIL, '-p', process.env.CSDX_PASSWORD]);
 
-          console.log("🔐 OTP generated:", otp);
-
-          const login = spawn('csdx', ['auth:login', '-u', email, '-p', password]);
-
-          let sentChannel = false;
-          let sentOTP = false;
-
-          login.stdout.on('data', (data) => {
-            const output = data.toString();
-            process.stdout.write(output);
-
-            if (output.includes('Please select OTP channel') && !sentChannel) {
-              login.stdin.write('1\n');
-              sentChannel = true;
-              console.log('✅ Sent OTP channel selection');
-            }
-
-            if (output.includes('Please provide the security code') && !sentOTP) {
-              login.stdin.write(otp + '\n');
-              sentOTP = true;
-              console.log('✅ Sent OTP code');
-            }
+          login.stdout.on('data', data => {
+            const out = data.toString();
+            process.stdout.write(out);
+            if (out.includes('OTP channel')) login.stdin.write('1\n');
+            if (out.includes('security code')) login.stdin.write(`${otp}\n`);
           });
 
-          login.stderr.on('data', (data) => {
-            process.stderr.write(data.toString());
-          });
-
-          login.on('close', (code) => {
-            console.log(`🔚 Login process exited with code: ${code}`);
-            process.exit(code);
-          });
+          login.stderr.on('data', d => process.stderr.write(d.toString()));
+          login.on('close', code => process.exit(code));
           EOF
 
       - name: Verify CSDX Login
