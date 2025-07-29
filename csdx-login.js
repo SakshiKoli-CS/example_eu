@@ -1,66 +1,76 @@
 const { spawn } = require('child_process');
 const { authenticator } = require('otplib');
 
-// Load environment variables
 const email = process.env.CSDX_EMAIL;
 const password = process.env.CSDX_PASSWORD;
 const secret = process.env.CSDX_TOTP_SECRET;
-
-// Generate the TOTP code
 const token = authenticator.generate(secret);
 
-const login = spawn('csdx', ['auth:login', '-u', email, '-p', password], {
-  stdio: ['pipe', 'pipe', 'inherit'],
-});
+async function start() {
+  const proc = spawnLoginProcess();
+  await waitForOtpPrompt(proc);
+  await chooseAuthy(proc);
+  await submitOtp(proc);
+}
 
-let buffer = '';
-let channelSelected = false;
-let otpSent = false;
+start();
 
-login.stdout.on('data', (data) => {
-  const text = data.toString();
-  buffer += text;
+function spawnLoginProcess() {
+  return spawn('csdx', ['auth:login', '-u', email, '-p', password], {
+    stdio: ['pipe', 'pipe', 'inherit'],
+  });
+}
 
-  // Filter out the repeated interactive prompts
-  const filtered = text
-    .replace(/.*Please select OTP channel.*/gi, '')
-    .replace(/.*Please provide the security code.*/gi, '');
+function waitForOtpPrompt(proc) {
+  return new Promise((resolve) => {
+    proc.stdout.on('data', (data) => {
+      const text = data.toString();
 
-  // Print anything that's not a prompt
-  if (filtered.trim()) {
-    process.stdout.write(filtered);
-  }
+      if (text.includes('Please select OTP channel')) {
+        resolve();
+      }
+    });
+  });
+}
 
-  // Handle OTP channel selection
-  if (!channelSelected && buffer.includes('Please select OTP channel')) {
-    channelSelected = true;
+function chooseAuthy(proc) {
+  return new Promise((resolve) => {
     setTimeout(() => {
-      login.stdin.write('1\n'); // Select 'Authy App'
-      console.log('\n✅ Selected OTP channel: Authy App');
+      proc.stdin.write('1\n');
+      console.log('\n Selected OTP channel: Authy App');
+      resolve();
     }, 300);
-  }
+  });
+}
 
-  // Handle OTP code submission
-  if (!otpSent && buffer.toLowerCase().includes('please provide the security code')) {
-    otpSent = true;
-    setTimeout(() => {
-      login.stdin.write(token + '\n');
-      console.log('\n🔐 OTP Code: ' + token);
-    }, 400);
-  }
+function submitOtp(proc) {
+  return new Promise((resolve) => {
+    let sentOtp = false;
+    let loginDone = false;
 
-  // Handle successful login
-  if (text.toLowerCase().includes('successfully logged in')) {
-    console.log('\n✅ Login successful!');
-  }
+    proc.stdout.on('data', (data) => {
+      const text = data.toString();
 
-  // Handle OTP failure
-  if (text.toLowerCase().includes('two-factor authentication verification failed')) {
-    console.error('\n❌ OTP verification failed');
-  }
-});
+      if (!sentOtp && text.toLowerCase().includes('please provide the security code')) {
+        sentOtp = true;
+        proc.stdin.write(token + '\n');
+        console.log('\n🔐 OTP Code:', token);
+      }
 
-login.on('close', (code) => {
-  console.log('\n🔚 Login process exited with code:', code);
-  process.exit(code);
-});
+      if (!loginDone && text.toLowerCase().includes('successfully logged in')) {
+        loginDone = true;
+        console.log('\n Login successful!');
+        resolve();
+      }
+
+      if (text.toLowerCase().includes('two-factor authentication verification failed')) {
+        console.error('\n OTP verification failed');
+        resolve();
+      }
+    });
+
+    proc.on('close', (code) => {
+      console.log('\n Login process exited with code:', code);
+    });
+  });
+}
